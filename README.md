@@ -50,10 +50,10 @@ AppModule	- TvMazeDatabase, FavouriteDao
 1. retry should reload data after error	retry() - инициирует новую загрузку
 2. addingSameShowTwiceShouldNotCreateDuplicate -	повторное добавление не создаёт дубль
 
-<img src="screenshots/pht1.jpg" width="200"> <img src="screenshots/pht1.jpg" width="200">
-<img src="screenshots/pht2.jpg" width="200">
+<img src="screenshots/pht1.jpg" width="200"> <img src="screenshots/pht2.jpg" width="200">
 <img src="screenshots/pht3.jpg" width="200">
 <img src="screenshots/pht4.jpg" width="200">
 <img src="screenshots/pht5.jpg" width="200">
 <img src="screenshots/pht6.jpg" width="200">
 <img src="screenshots/pht7.jpg" width="200">
+<img src="screenshots/pht8.jpg" width="200">
