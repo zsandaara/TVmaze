@@ -38,7 +38,6 @@ android {
         }
     }
 
-    // ✅ testOptions теперь внутри android {}
     testOptions {
         execution = "ANDROIDX_TEST_ORCHESTRATOR"
     }
@@ -78,7 +77,6 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 
-    // Unit tests
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
     testImplementation("app.cash.turbine:turbine:1.0.0")
@@ -87,7 +85,6 @@ dependencies {
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
     testImplementation("androidx.arch.core:core-testing:2.2.0")
 
-    // Android tests
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.5.0")
@@ -96,7 +93,6 @@ dependencies {
     androidTestImplementation("org.mockito:mockito-android:5.5.0")
     androidTestImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
 
-    // Для orchestrator
     androidTestUtil("androidx.test:orchestrator:1.4.2")
 }
 

@@ -82,7 +82,6 @@ class DetailViewModelTest {
 
         viewModel = DetailViewModel(repository, favouriteRepository)
 
-        // Имитируем, что show не в избранном
         `when`(favouriteRepository.isFavourite(1)).thenReturn(false)
 
         viewModel.toggleFavourite(show)
