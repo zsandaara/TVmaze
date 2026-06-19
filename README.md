@@ -32,23 +32,35 @@ DI модули:
 NetworkModule - Retrofit, TvMazeApiService
 AppModule	- TvMazeDatabase, FavouriteDao
 
-Юнит-тесты
-1	initial state should be Loading -	начальное состояние
-2	loadShows should return Success state with shows	- успешная загрузка
-3	loadShows should return Error state on network failure	- ошибка загрузки
-4	retry should reload data after error	retry() - после ошибки
-5	empty search result should return Empty state	- пустой результат
-6	toggleFavourite should add and remove from favourites	- бизнес-логика
-7	loadShowDetails should return Success state with show	- успешная загрузка деталей
+Исправлено:
 
-Интеграционные тесты
-1. addToFavouritesThenGetAllFavouritesShouldReturnAddedShow -	запись в Room
-2. addingSameShowTwiceShouldNotCreateDuplicate	- отсутствие дублей
-3. removeFromFavouritesShouldRemoveShowFromFavourites -	удаление из Room
+Юнит-тесты (7 шт.)
 
-Нетривиальные тесты
-1. retry should reload data after error	retry() - инициирует новую загрузку
-2. addingSameShowTwiceShouldNotCreateDuplicate -	повторное добавление не создаёт дубль
+1. initial state should be Loading	(ListViewModelTest)	- Проверка начального состояния экрана
+2. loadShows should return Success state with shows	(ListViewModelTest) -	Успешная загрузка данных
+3. loadShows should return Error state on network failure	(ListViewModelTest) -	Ошибка загрузки
+4. retry should reload data after error	(ListViewModelTest) -	Retry после ошибки
+5. empty search result should return Empty state	(ListViewModelTest) -	Пустой результат поиска
+6. toggleFavourite should add and remove from favourites	(DetailViewModelTest) -	Бизнес-логика избранного
+7. loadShowDetails should return Success state with show	(DetailViewModelTest) -	Успешная загрузка деталей
+
+Интеграционные тесты (4 шт.)
+
+1. addToFavouritesThenGetAllFavouritesShouldReturnAddedShow (FavouriteRepositoryIntegrationTest) -	Data-слой (Repository + Room)
+2. addingSameShowTwiceShouldNotCreateDuplicateAndShouldUpdateData (FavouriteRepositoryIntegrationTest) -	Data-слой (отсутствие дублей)
+3. removeFromFavouritesShouldRemoveShowFromFavourites	(FavouriteRepositoryIntegrationTest) - Data-слой (удаление)
+4. clickOnShowShouldNavigateToDetailScreen	(ListScreenNavigationTest) - UI-интеграция (список → клик → детали)
+
+Нетривиальные тесты (3 шт.)
+
+1. retry should reload data after error	(ListViewModelTest)	retry() инициирует новую загрузку
+2. addingSameShowTwiceShouldNotCreateDuplicateAndShouldUpdateData	(FavouriteRepositoryIntegrationTest) - Повторное добавление не создаёт дубль и обновляет данные
+3. toggleFavourite should add when not favourite and remove when favourite	(DetailViewModelTest) -	Toggle работает в обе стороны
+
+Flow-тесты (2 шт.)
+
+1. loadShows should emit Loading then Success sequence	(ListViewModelFlowTest) -	Полная последовательность эмиссий
+2. search should cancel previous request and show only latest result (ListViewModelFlowTest) - Нетривиальное потоковое поведение (отмена устаревшего запроса)
 
 <img src="screenshots/pht1.jpg" width="200"> <img src="screenshots/pht2.jpg" width="200">
 <img src="screenshots/pht3.jpg" width="200">
