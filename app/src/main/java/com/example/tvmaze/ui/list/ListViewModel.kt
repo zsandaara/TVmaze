@@ -60,15 +60,31 @@ class ListViewModel @Inject constructor(
                 } else {
                     val existingShows = if (currentPage == 0) emptyList()
                     else (currentState as? ListUiState.Success)?.shows ?: emptyList()
-                    val allShows = existingShows + shows
+
+                    val allShows = (existingShows + shows).distinctBy { it.id }
                     _uiState.value = ListUiState.Success(allShows, isLoadingMore = false)
                 }
             } catch (e: IOException) {
-                _uiState.value = ListUiState.Error("Ошибка сети: ${e.message}")
+                val previousState = _uiState.value
+                if (previousState is ListUiState.Success) {
+                    _uiState.value = ListUiState.Success(previousState.shows, isLoadingMore = false)
+                } else {
+                    _uiState.value = ListUiState.Error("Ошибка сети: ${e.message}")
+                }
             } catch (e: HttpException) {
-                _uiState.value = ListUiState.Error("Ошибка сервера: ${e.code()}")
+                val previousState = _uiState.value
+                if (previousState is ListUiState.Success) {
+                    _uiState.value = ListUiState.Success(previousState.shows, isLoadingMore = false)
+                } else {
+                    _uiState.value = ListUiState.Error("Ошибка сервера: ${e.code()}")
+                }
             } catch (e: Exception) {
-                _uiState.value = ListUiState.Error("Неизвестная ошибка: ${e.message}")
+                val previousState = _uiState.value
+                if (previousState is ListUiState.Success) {
+                    _uiState.value = ListUiState.Success(previousState.shows, isLoadingMore = false)
+                } else {
+                    _uiState.value = ListUiState.Error("Неизвестная ошибка: ${e.message}")
+                }
             }
         }
     }
@@ -96,7 +112,8 @@ class ListViewModel @Inject constructor(
                     if (shows.isEmpty()) {
                         _uiState.value = ListUiState.Empty
                     } else {
-                        _uiState.value = ListUiState.Success(shows, isLoadingMore = false)
+                        val uniqueShows = shows.distinctBy { it.id }
+                        _uiState.value = ListUiState.Success(uniqueShows, isLoadingMore = false)
                     }
                 }
             } catch (e: IOException) {
@@ -117,8 +134,12 @@ class ListViewModel @Inject constructor(
 
     fun nextPage() {
         if (!isSearchMode) {
-            currentPage++
-            loadShowsFromApi()
+            val currentState = _uiState.value
+            // Проверяем, что не идет загрузка и есть данные
+            if (currentState is ListUiState.Success && !currentState.isLoadingMore) {
+                currentPage++
+                loadShowsFromApi()
+            }
         }
     }
 

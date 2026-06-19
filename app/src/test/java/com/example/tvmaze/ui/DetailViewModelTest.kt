@@ -70,10 +70,12 @@ class DetailViewModelTest {
 
         val state = viewModel.uiState.value
         assertTrue(state is DetailUiState.Error)
+        assertTrue((state as DetailUiState.Error).message.contains("Network error"))
     }
 
     @Test
-    fun `toggleFavourite should add and remove from favourites`() = runTest {
+    fun `toggleFavourite should add when not favourite and remove when favourite`() = runTest {
+        // НЕТРИВИАЛЬНЫЙ ТЕСТ: проверяем оба сценария
         val show = Show(
             id = 1, name = "Test Show", summary = null, genres = listOf("Drama"),
             rating = null, image = null, language = null, premiered = null,
@@ -83,9 +85,69 @@ class DetailViewModelTest {
         viewModel = DetailViewModel(repository, favouriteRepository)
 
         `when`(favouriteRepository.isFavourite(1)).thenReturn(false)
-
         viewModel.toggleFavourite(show)
         advanceUntilIdle()
         verify(favouriteRepository, times(1)).addToFavourites(show)
+        verify(favouriteRepository, never()).removeFromFavourites(anyInt())
+        assertTrue(viewModel.isFavourite.value)
+
+        `when`(favouriteRepository.isFavourite(1)).thenReturn(true)
+        viewModel.toggleFavourite(show)
+        advanceUntilIdle()
+        verify(favouriteRepository, times(1)).removeFromFavourites(1)
+        assertFalse(viewModel.isFavourite.value)
+    }
+
+    @Test
+    fun `retry should initiate new request after error`() = runTest {
+        val expectedShow = Show(
+            id = 1, name = "Test Show", summary = null, genres = listOf("Drama"),
+            rating = null, image = null, language = null, premiered = null,
+            ended = null, status = null, officialSite = null
+        )
+
+        `when`(repository.getShowById(1))
+            .thenThrow(RuntimeException("Network error"))
+            .thenReturn(expectedShow)
+
+        viewModel = DetailViewModel(repository, favouriteRepository)
+        viewModel.loadShowDetails(1)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value is DetailUiState.Error)
+
+        viewModel.retry(1)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state is DetailUiState.Success)
+        assertEquals(1, (state as DetailUiState.Success).show.id)
+
+        verify(repository, times(2)).getShowById(1)
+    }
+
+    @Test
+    fun `old request should be cancelled when new request comes`() = runTest {
+        `when`(repository.getShowById(1)).thenAnswer {
+            Thread.sleep(1000)
+            Show(id = 1, name = "Show 1", summary = null, genres = emptyList(),
+                rating = null, image = null, language = null, premiered = null,
+                ended = null, status = null, officialSite = null)
+        }
+        `when`(repository.getShowById(2)).thenAnswer {
+            Show(id = 2, name = "Show 2", summary = null, genres = emptyList(),
+                rating = null, image = null, language = null, premiered = null,
+                ended = null, status = null, officialSite = null)
+        }
+
+        viewModel = DetailViewModel(repository, favouriteRepository)
+
+        viewModel.loadShowDetails(1)
+        viewModel.loadShowDetails(2)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state is DetailUiState.Success)
+        assertEquals(2, (state as DetailUiState.Success).show.id)
     }
 }

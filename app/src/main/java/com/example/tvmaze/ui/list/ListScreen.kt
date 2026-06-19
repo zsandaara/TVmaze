@@ -8,22 +8,26 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.tvmaze.data.model.Show
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ListScreen(
     onShowClick: (Int) -> Unit,
-    viewModel: ListViewModel
+    viewModel: ListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
 
     Column(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag("list_screen")
     ) {
         // Поисковая строка
         OutlinedTextField(
@@ -34,16 +38,19 @@ fun ListScreen(
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(16.dp)
+                .testTag("search_field"),
             placeholder = { Text("Поиск сериалов...") },
             singleLine = true
         )
 
         // Контент
-        when (uiState) {
+        when (val currentState = uiState) {
             is ListUiState.Loading -> {
                 Box(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag("loading_indicator"),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator()
@@ -51,18 +58,22 @@ fun ListScreen(
             }
 
             is ListUiState.Error -> {
-                val errorState = uiState as ListUiState.Error
                 Box(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag("error_state"),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = errorState.message,
+                            text = currentState.message,
                             color = MaterialTheme.colorScheme.error,
                             modifier = Modifier.padding(16.dp)
                         )
-                        Button(onClick = { viewModel.retry() }) {
+                        Button(
+                            onClick = { viewModel.retry() },
+                            modifier = Modifier.testTag("retry_button")
+                        ) {
                             Text("Повторить")
                         }
                     }
@@ -71,22 +82,26 @@ fun ListScreen(
 
             is ListUiState.Empty -> {
                 Box(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag("empty_state"),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Ничего не найдено", fontSize = 18.sp)
+                    Text(
+                        text = "Ничего не найдено",
+                        fontSize = 18.sp,
+                        modifier = Modifier.testTag("empty_message")
+                    )
                 }
             }
 
             is ListUiState.Success -> {
-                val successState = uiState as ListUiState.Success
-                val shows = successState.shows
-                val isLoadingMore = successState.isLoadingMore
+                val shows = currentState.shows
+                val isLoadingMore = currentState.isLoadingMore
                 val listState = rememberLazyListState()
 
-                // Бесконечная прокрутка
                 LaunchedEffect(listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index) {
-                    if (!isLoadingMore) {
+                    if (!isLoadingMore && shows.isNotEmpty()) {
                         val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: return@LaunchedEffect
                         if (lastVisibleIndex >= shows.size - 3) {
                             viewModel.nextPage()
@@ -96,20 +111,31 @@ fun ListScreen(
 
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag("shows_list"),
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(shows, key = { it.id }) { show ->
-                        ShowCard(show = show, onClick = { onShowClick(show.id) })
+                    items(
+                        items = shows,
+                        key = { show -> show.id }
+                    ) { show ->
+                        ShowCard(
+                            show = show,
+                            onClick = { onShowClick(show.id) }
+                        )
                     }
 
                     if (isLoadingMore) {
-                        item {
+                        item(
+                            key = "loading_more_item"
+                        ) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(16.dp),
+                                    .padding(16.dp)
+                                    .testTag("loading_more"),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Row(
@@ -140,7 +166,9 @@ fun ListScreen(
 fun ShowCard(show: Show, onClick: () -> Unit) {
     Card(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("show_card"),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
@@ -152,7 +180,8 @@ fun ShowCard(show: Show, onClick: () -> Unit) {
             Text(
                 text = show.name,
                 fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.testTag("show_title")
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -161,7 +190,8 @@ fun ShowCard(show: Show, onClick: () -> Unit) {
                 Text(
                     text = "${show.rating.average}/10",
                     fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.testTag("show_rating")
                 )
             }
 
@@ -170,14 +200,16 @@ fun ShowCard(show: Show, onClick: () -> Unit) {
             if (show.genres.isNotEmpty()) {
                 Text(
                     text = "Жанры: ${show.genres.joinToString(", ")}",
-                    fontSize = 13.sp
+                    fontSize = 13.sp,
+                    modifier = Modifier.testTag("show_genres")
                 )
             }
 
             if (show.premiered != null) {
                 Text(
                     text = "Премьера: ${show.premiered}",
-                    fontSize = 13.sp
+                    fontSize = 13.sp,
+                    modifier = Modifier.testTag("show_premiered")
                 )
             }
 
@@ -192,7 +224,8 @@ fun ShowCard(show: Show, onClick: () -> Unit) {
                     fontSize = 12.sp,
                     maxLines = 2,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("show_summary")
                 )
             }
         }

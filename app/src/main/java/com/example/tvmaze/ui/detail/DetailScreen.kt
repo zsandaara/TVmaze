@@ -11,62 +11,77 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.tvmaze.data.model.Show
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailScreen(
     showId: Int,
-    viewModel: DetailViewModel,
+    viewModel: DetailViewModel = hiltViewModel(),
     onBackClick: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val isFavourite by viewModel.isFavourite.collectAsState()
 
-    // Загружаем детали при первом запуске
     LaunchedEffect(showId) {
         viewModel.loadShowDetails(showId)
     }
 
-    when (uiState) {
-        is DetailUiState.Loading -> {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag("detail_screen")
+    ) {
+        when (uiState) {
+            is DetailUiState.Loading -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag("detail_loading"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
             }
-        }
 
-        is DetailUiState.Error -> {
-            val errorState = uiState as DetailUiState.Error
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = errorState.message,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(16.dp)
-                    )
-                    Button(onClick = { viewModel.retry(showId) }) {
-                        Text("Повторить")
+            is DetailUiState.Error -> {
+                val errorState = uiState as DetailUiState.Error
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag("detail_error"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = errorState.message,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                        Button(
+                            onClick = { viewModel.retry(showId) },
+                            modifier = Modifier.testTag("detail_retry_button")
+                        ) {
+                            Text("Повторить")
+                        }
                     }
                 }
             }
-        }
 
-        is DetailUiState.Success -> {
-            val show = (uiState as DetailUiState.Success).show
-            DetailContent(
-                show = show,
-                isFavourite = isFavourite,
-                onFavouriteClick = { viewModel.toggleFavourite(show) },
-                onBackClick = onBackClick
-            )
+            is DetailUiState.Success -> {
+                val show = (uiState as DetailUiState.Success).show
+                DetailContent(
+                    show = show,
+                    isFavourite = isFavourite,
+                    onFavouriteClick = { viewModel.toggleFavourite(show) },
+                    onBackClick = onBackClick
+                )
+            }
         }
     }
 }
@@ -80,13 +95,15 @@ fun DetailContent(
     onBackClick: () -> Unit
 ) {
     Scaffold(
+        modifier = Modifier.testTag("detail_screen_scaffold"),
         topBar = {
             TopAppBar(
                 title = {
                     Text(
                         show.name,
                         maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier.testTag("detail_title")
                     )
                 },
                 navigationIcon = {
@@ -100,15 +117,18 @@ fun DetailContent(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onFavouriteClick) {
+                    IconButton(
+                        onClick = onFavouriteClick,
+                        modifier = Modifier.testTag("favourite_button")
+                    ) {
                         Icon(
                             imageVector = if (isFavourite) Icons.Filled.Favorite else Icons.Outlined.Favorite,
                             contentDescription = if (isFavourite) "Удалить из избранного" else "Добавить в избранное",
-                            tint = if (isFavourite) Color.Red else MaterialTheme.colorScheme.onSurface
+                            tint = if (isFavourite) Color.Red else MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.testTag("favourite_icon")
                         )
                     }
                 }
-                // Убрали colors - используем стандартные цвета
             )
         }
     ) { paddingValues ->
@@ -117,51 +137,73 @@ fun DetailContent(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(16.dp)
+                .testTag("detail_content"),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Жанры
             if (show.genres.isNotEmpty()) {
-                DetailInfoRow("Жанры", show.genres.joinToString(", "))
+                DetailInfoRow(
+                    label = "Жанры",
+                    value = show.genres.joinToString(", "),
+                    tag = "detail_genres"
+                )
             }
 
-            // Рейтинг
             if (show.rating?.average != null) {
-                DetailInfoRow("Рейтинг", "${show.rating.average}/10")
+                DetailInfoRow(
+                    label = "Рейтинг",
+                    value = "${show.rating.average}/10",
+                    tag = "detail_rating"
+                )
             }
 
-            // Статус
             if (show.status != null) {
-                DetailInfoRow("Статус", show.status)
+                DetailInfoRow(
+                    label = "Статус",
+                    value = show.status,
+                    tag = "detail_status"
+                )
             }
 
-            // Язык
             if (show.language != null) {
-                DetailInfoRow("Язык", show.language)
+                DetailInfoRow(
+                    label = "Язык",
+                    value = show.language,
+                    tag = "detail_language"
+                )
             }
 
-            // Дата премьеры
             if (show.premiered != null) {
-                DetailInfoRow("Премьера", show.premiered)
+                DetailInfoRow(
+                    label = "Премьера",
+                    value = show.premiered,
+                    tag = "detail_premiered"
+                )
             }
 
-            // Дата окончания
             if (show.ended != null) {
-                DetailInfoRow("Окончание", show.ended)
+                DetailInfoRow(
+                    label = "Окончание",
+                    value = show.ended,
+                    tag = "detail_ended"
+                )
             }
 
-            // Официальный сайт
             if (show.officialSite != null) {
-                DetailInfoRow("Официальный сайт", show.officialSite)
+                DetailInfoRow(
+                    label = "Официальный сайт",
+                    value = show.officialSite,
+                    tag = "detail_official_site"
+                )
             }
 
             Divider(modifier = Modifier.padding(vertical = 8.dp))
 
-            // Описание
             Text(
                 text = "Описание",
                 fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.testTag("detail_description_label")
             )
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -170,27 +212,32 @@ fun DetailContent(
             Text(
                 text = cleanSummary,
                 fontSize = 14.sp,
-                lineHeight = 20.sp
+                lineHeight = 20.sp,
+                modifier = Modifier.testTag("detail_summary")
             )
         }
     }
 }
 
 @Composable
-fun DetailInfoRow(label: String, value: String) {
+fun DetailInfoRow(label: String, value: String, tag: String = "") {
     Column(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(tag)
     ) {
         Text(
             text = label,
             fontWeight = FontWeight.Bold,
             fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.primary
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.testTag("${tag}_label")
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = value,
-            fontSize = 14.sp
+            fontSize = 14.sp,
+            modifier = Modifier.testTag("${tag}_value")
         )
     }
 }

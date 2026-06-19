@@ -6,10 +6,9 @@ import com.example.tvmaze.data.model.Show
 import com.example.tvmaze.data.repository.ShowRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
+import org.junit.Assert.*
 import org.junit.Test
 import org.mockito.Mockito.*
-import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
 import retrofit2.HttpException
 import java.io.IOException
@@ -41,7 +40,7 @@ class ShowRepositoryTest {
 
         try {
             repository.getShows(0)
-            assert(false) { "Expected exception was not thrown" }
+            fail("Expected RuntimeException was not thrown")
         } catch (e: RuntimeException) {
             assertEquals("Network error", e.message)
         }
@@ -60,6 +59,15 @@ class ShowRepositoryTest {
 
         assertEquals(1, result.size)
         assertEquals("Found Show", result[0].name)
+    }
+
+    @Test
+    fun `searchShows should return empty list when no results`() = runTest {
+        `when`(apiService.searchShows("nonexistent")).thenReturn(emptyList())
+
+        val result = repository.searchShows("nonexistent")
+
+        assertTrue(result.isEmpty())
     }
 
     @Test
