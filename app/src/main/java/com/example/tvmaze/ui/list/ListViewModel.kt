@@ -2,6 +2,7 @@ package com.example.tvmaze.ui.list
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.tvmaze.data.model.Show
 import com.example.tvmaze.data.repository.FavouriteRepository
 import com.example.tvmaze.data.repository.ShowRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -28,6 +29,10 @@ class ListViewModel @Inject constructor(
     private var lastQuery = ""
 
     private var searchJob: Job? = null
+    private var isLoadingMore = false
+
+    private var loadedPages = mutableListOf<List<Show>>()
+    private var currentShows = mutableListOf<Show>()
 
     init {
         loadShows()
@@ -37,20 +42,34 @@ class ListViewModel @Inject constructor(
         if (isSearchMode && lastQuery.isNotBlank()) {
             searchShows(lastQuery)
         } else {
+            resetPagination()
             loadShowsFromApi()
         }
     }
 
+    private fun resetPagination() {
+        currentPage = 0
+        loadedPages.clear()
+        currentShows.clear()
+        isLoadingMore = false
+    }
+
     private fun loadShowsFromApi() {
+        if (isLoadingMore) return
+
         viewModelScope.launch {
             val currentState = _uiState.value
-
             val isFirstLoad = currentState !is ListUiState.Success
 
             if (isFirstLoad) {
                 _uiState.value = ListUiState.Loading
             } else if (currentState is ListUiState.Success) {
-                _uiState.value = ListUiState.Success(currentState.shows, isLoadingMore = true)
+                isLoadingMore = true
+                _uiState.value = ListUiState.Success(
+                    currentState.shows,
+                    isLoadingMore = true,
+                    hasError = false
+                )
             }
 
             try {
@@ -58,34 +77,58 @@ class ListViewModel @Inject constructor(
                 if (shows.isEmpty() && currentPage == 0) {
                     _uiState.value = ListUiState.Empty
                 } else {
-                    val existingShows = if (currentPage == 0) emptyList()
-                    else (currentState as? ListUiState.Success)?.shows ?: emptyList()
+                    if (currentPage > 0) {
+                        loadedPages.add(shows)
+                    }
 
-                    val allShows = (existingShows + shows).distinctBy { it.id }
-                    _uiState.value = ListUiState.Success(allShows, isLoadingMore = false)
+                    if (currentPage == 0) {
+                        currentShows = shows.distinctBy { it.id }.toMutableList()
+                    } else {
+                        currentShows.addAll(shows)
+                        currentShows = currentShows.distinctBy { it.id }.toMutableList()
+                    }
+
+                    isLoadingMore = false
+                    _uiState.value = ListUiState.Success(
+                        currentShows.toList(),
+                        isLoadingMore = false,
+                        hasError = false
+                    )
                 }
             } catch (e: IOException) {
-                val previousState = _uiState.value
-                if (previousState is ListUiState.Success) {
-                    _uiState.value = ListUiState.Success(previousState.shows, isLoadingMore = false)
-                } else {
-                    _uiState.value = ListUiState.Error("Ошибка сети: ${e.message}")
-                }
+                handlePaginationError(e.message ?: "Ошибка сети")
             } catch (e: HttpException) {
-                val previousState = _uiState.value
-                if (previousState is ListUiState.Success) {
-                    _uiState.value = ListUiState.Success(previousState.shows, isLoadingMore = false)
-                } else {
-                    _uiState.value = ListUiState.Error("Ошибка сервера: ${e.code()}")
-                }
+                handlePaginationError("Ошибка сервера: ${e.code()}")
             } catch (e: Exception) {
-                val previousState = _uiState.value
-                if (previousState is ListUiState.Success) {
-                    _uiState.value = ListUiState.Success(previousState.shows, isLoadingMore = false)
-                } else {
-                    _uiState.value = ListUiState.Error("Неизвестная ошибка: ${e.message}")
-                }
+                handlePaginationError("Неизвестная ошибка: ${e.message}")
             }
+        }
+    }
+
+    private fun handlePaginationError(message: String) {
+        isLoadingMore = false
+
+        val currentState = _uiState.value
+        if (currentState is ListUiState.Success) {
+            _uiState.value = ListUiState.Success(
+                currentState.shows,
+                isLoadingMore = false,
+                hasError = true
+            )
+        } else {
+            _uiState.value = ListUiState.Error(message)
+        }
+    }
+
+    fun retryNextPage() {
+        val currentState = _uiState.value
+        if (currentState is ListUiState.Success && currentState.hasError) {
+            _uiState.value = ListUiState.Success(
+                currentState.shows,
+                isLoadingMore = true,
+                hasError = false
+            )
+            loadShowsFromApi()
         }
     }
 
@@ -95,7 +138,7 @@ class ListViewModel @Inject constructor(
         if (query.isBlank()) {
             isSearchMode = false
             lastQuery = ""
-            currentPage = 0
+            resetPagination()
             loadShowsFromApi()
             return
         }
@@ -103,6 +146,8 @@ class ListViewModel @Inject constructor(
         isSearchMode = true
         lastQuery = query
         currentPage = 0
+        loadedPages.clear()
+        currentShows.clear()
 
         searchJob = viewModelScope.launch {
             _uiState.value = ListUiState.Loading
@@ -133,17 +178,19 @@ class ListViewModel @Inject constructor(
     }
 
     fun nextPage() {
-        if (!isSearchMode) {
+        if (!isSearchMode && !isLoadingMore) {
             val currentState = _uiState.value
-            // Проверяем, что не идет загрузка и есть данные
             if (currentState is ListUiState.Success && !currentState.isLoadingMore) {
-                currentPage++
-                loadShowsFromApi()
+                if (!currentState.hasError) {
+                    currentPage++
+                    loadShowsFromApi()
+                }
             }
         }
     }
 
     fun retry() {
+        resetPagination()
         loadShows()
     }
 }

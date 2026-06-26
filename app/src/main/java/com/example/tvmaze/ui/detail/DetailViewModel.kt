@@ -27,8 +27,8 @@ class DetailViewModel @Inject constructor(
     private val _isFavourite = MutableStateFlow(false)
     val isFavourite: StateFlow<Boolean> = _isFavourite.asStateFlow()
 
+    private var actualFavouriteState = false
     private var currentShow: Show? = null
-
     private var detailJob: Job? = null
     private var lastShowId: Int? = null
 
@@ -42,7 +42,8 @@ class DetailViewModel @Inject constructor(
                 val show = repository.getShowById(showId)
                 if (lastShowId == showId) {
                     currentShow = show
-                    _isFavourite.value = favouriteRepository.isFavourite(showId)
+                    actualFavouriteState = favouriteRepository.isFavourite(showId) ?: false
+                    _isFavourite.value = actualFavouriteState
                     _uiState.value = DetailUiState.Success(show)
                 }
             } catch (e: IOException) {
@@ -63,12 +64,23 @@ class DetailViewModel @Inject constructor(
 
     fun toggleFavourite(show: Show) {
         viewModelScope.launch {
-            if (_isFavourite.value) {
-                favouriteRepository.removeFromFavourites(show.id)
-                _isFavourite.value = false
-            } else {
-                favouriteRepository.addToFavourites(show)
-                _isFavourite.value = true
+            val newState = !_isFavourite.value
+            val previousState = _isFavourite.value
+
+            _isFavourite.value = newState
+
+            try {
+                if (newState) {
+                    favouriteRepository.addToFavourites(show)
+                    actualFavouriteState = true
+                } else {
+                    favouriteRepository.removeFromFavourites(show.id)
+                    actualFavouriteState = false
+                }
+            } catch (e: Exception) {
+                _isFavourite.value = previousState
+                actualFavouriteState = previousState
+                e.printStackTrace()
             }
         }
     }

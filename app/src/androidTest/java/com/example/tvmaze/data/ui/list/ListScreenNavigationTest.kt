@@ -1,5 +1,7 @@
 package com.example.tvmaze.ui.list
 
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -27,6 +29,19 @@ class ListScreenNavigationTest {
     @get:Rule(order = 1)
     val composeTestRule = createAndroidComposeRule<MainActivity>()
 
+    private fun SemanticsNodeInteraction.getText(): String {
+        return try {
+            val semanticsNode = fetchSemanticsNode()
+            val textList = semanticsNode.config[SemanticsProperties.Text]
+            textList?.joinToString("") ?: ""
+        } catch (e: Exception) {
+            fetchSemanticsNode().toString()
+                .substringAfter("text=[")
+                .substringBefore("]")
+                .trim()
+        }
+    }
+
     @Test
     fun clickOnShowShouldNavigateToDetailScreen() {
         hiltRule.inject()
@@ -48,10 +63,16 @@ class ListScreenNavigationTest {
             }
         }
 
-        composeTestRule
+        val firstShowCard = composeTestRule
             .onAllNodesWithTag("show_card", useUnmergedTree = true)
             .onFirst()
-            .performClick()
+
+        val firstShowTitle = composeTestRule
+            .onAllNodesWithTag("show_title", useUnmergedTree = true)
+            .onFirst()
+            .getText()
+
+        firstShowCard.performClick()
 
         composeTestRule.waitUntil(5000) {
             try {
@@ -59,6 +80,18 @@ class ListScreenNavigationTest {
                     .onNodeWithTag("detail_screen", useUnmergedTree = true)
                     .assertIsDisplayed()
                 true
+            } catch (e: AssertionError) {
+                false
+            }
+        }
+
+        composeTestRule.waitUntil(3000) {
+            try {
+                val detailTitle = composeTestRule
+                    .onNodeWithTag("detail_title", useUnmergedTree = true)
+                    .getText()
+
+                detailTitle == firstShowTitle
             } catch (e: AssertionError) {
                 false
             }

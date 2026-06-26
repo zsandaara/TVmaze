@@ -5,17 +5,21 @@ import com.example.tvmaze.data.repository.FavouriteRepository
 import com.example.tvmaze.data.repository.ShowRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import org.mockito.Mockito.*
+import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.whenever
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DetailViewModelTest {
@@ -48,34 +52,33 @@ class DetailViewModelTest {
             rating = null, image = null, language = null, premiered = null,
             ended = null, status = null, officialSite = null
         )
-        `when`(repository.getShowById(1)).thenReturn(expectedShow)
-        `when`(favouriteRepository.isFavourite(1)).thenReturn(false)
+        whenever(repository.getShowById(1)).thenReturn(expectedShow)
+        whenever(favouriteRepository.isFavourite(1)).thenReturn(false)
 
         viewModel = DetailViewModel(repository, favouriteRepository)
         viewModel.loadShowDetails(1)
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertTrue(state is DetailUiState.Success)
+        assertTrue("State should be Success", state is DetailUiState.Success)
         assertEquals(1, (state as DetailUiState.Success).show.id)
     }
 
     @Test
     fun `loadShowDetails should return Error state on network failure`() = runTest {
-        `when`(repository.getShowById(1)).thenThrow(RuntimeException("Network error"))
+        whenever(repository.getShowById(1)).thenThrow(RuntimeException("Network error"))
 
         viewModel = DetailViewModel(repository, favouriteRepository)
         viewModel.loadShowDetails(1)
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertTrue(state is DetailUiState.Error)
+        assertTrue("State should be Error", state is DetailUiState.Error)
         assertTrue((state as DetailUiState.Error).message.contains("Network error"))
     }
 
     @Test
     fun `toggleFavourite should add when not favourite and remove when favourite`() = runTest {
-        // НЕТРИВИАЛЬНЫЙ ТЕСТ: проверяем оба сценария
         val show = Show(
             id = 1, name = "Test Show", summary = null, genres = listOf("Drama"),
             rating = null, image = null, language = null, premiered = null,
@@ -84,14 +87,14 @@ class DetailViewModelTest {
 
         viewModel = DetailViewModel(repository, favouriteRepository)
 
-        `when`(favouriteRepository.isFavourite(1)).thenReturn(false)
+        whenever(favouriteRepository.isFavourite(1)).thenReturn(false)
         viewModel.toggleFavourite(show)
         advanceUntilIdle()
         verify(favouriteRepository, times(1)).addToFavourites(show)
-        verify(favouriteRepository, never()).removeFromFavourites(anyInt())
+        verify(favouriteRepository, never()).removeFromFavourites(any())
         assertTrue(viewModel.isFavourite.value)
 
-        `when`(favouriteRepository.isFavourite(1)).thenReturn(true)
+        whenever(favouriteRepository.isFavourite(1)).thenReturn(true)
         viewModel.toggleFavourite(show)
         advanceUntilIdle()
         verify(favouriteRepository, times(1)).removeFromFavourites(1)
@@ -100,54 +103,80 @@ class DetailViewModelTest {
 
     @Test
     fun `retry should initiate new request after error`() = runTest {
-        val expectedShow = Show(
-            id = 1, name = "Test Show", summary = null, genres = listOf("Drama"),
+        val successShow = Show(
+            id = 1, name = "Success Show", summary = "Success summary", genres = listOf("Comedy"),
             rating = null, image = null, language = null, premiered = null,
             ended = null, status = null, officialSite = null
         )
 
-        `when`(repository.getShowById(1))
+        whenever(repository.getShowById(1))
             .thenThrow(RuntimeException("Network error"))
-            .thenReturn(expectedShow)
+            .thenReturn(successShow)
+
+        whenever(favouriteRepository.isFavourite(1)).thenReturn(false)
 
         viewModel = DetailViewModel(repository, favouriteRepository)
+
         viewModel.loadShowDetails(1)
         advanceUntilIdle()
 
-        assertTrue(viewModel.uiState.value is DetailUiState.Error)
+        val errorState = viewModel.uiState.value
+        assertTrue("State should be Error", errorState is DetailUiState.Error)
 
         viewModel.retry(1)
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertTrue(state is DetailUiState.Success)
-        assertEquals(1, (state as DetailUiState.Success).show.id)
+        assertTrue("State should be Success", state is DetailUiState.Success)
+        if (state is DetailUiState.Success) {
+            assertEquals("Success Show", state.show.name)
+        }
 
         verify(repository, times(2)).getShowById(1)
     }
 
     @Test
     fun `old request should be cancelled when new request comes`() = runTest {
-        `when`(repository.getShowById(1)).thenAnswer {
-            Thread.sleep(1000)
-            Show(id = 1, name = "Show 1", summary = null, genres = emptyList(),
-                rating = null, image = null, language = null, premiered = null,
-                ended = null, status = null, officialSite = null)
+        val show1 = Show(
+            id = 1, name = "Show 1", summary = null, genres = emptyList(),
+            rating = null, image = null, language = null, premiered = null,
+            ended = null, status = null, officialSite = null
+        )
+        val show2 = Show(
+            id = 2, name = "Show 2", summary = null, genres = emptyList(),
+            rating = null, image = null, language = null, premiered = null,
+            ended = null, status = null, officialSite = null
+        )
+
+        whenever(repository.getShowById(1)).thenAnswer {
+            runBlocking {
+                delay(5000)
+                show1
+            }
         }
-        `when`(repository.getShowById(2)).thenAnswer {
-            Show(id = 2, name = "Show 2", summary = null, genres = emptyList(),
-                rating = null, image = null, language = null, premiered = null,
-                ended = null, status = null, officialSite = null)
-        }
+        whenever(repository.getShowById(2)).thenReturn(show2)
+
+        whenever(favouriteRepository.isFavourite(1)).thenReturn(false)
+        whenever(favouriteRepository.isFavourite(2)).thenReturn(false)
 
         viewModel = DetailViewModel(repository, favouriteRepository)
 
         viewModel.loadShowDetails(1)
+
+        delay(100)
+
         viewModel.loadShowDetails(2)
+
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertTrue(state is DetailUiState.Success)
-        assertEquals(2, (state as DetailUiState.Success).show.id)
+        assertTrue("State should be Success", state is DetailUiState.Success)
+        if (state is DetailUiState.Success) {
+            assertEquals("Should show second show", 2, state.show.id)
+            assertEquals("Show 2", state.show.name)
+        }
+
+        verify(repository, times(1)).getShowById(1)
+        verify(repository, times(1)).getShowById(2)
     }
 }

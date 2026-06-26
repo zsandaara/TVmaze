@@ -17,13 +17,17 @@ class FavouriteRepository @Inject constructor(
     }
 
     suspend fun addToFavourites(show: Show) {
+        addToFavourites(show, System.currentTimeMillis())
+    }
+
+    suspend fun addToFavourites(show: Show, timestamp: Long) {
         val entity = FavouriteEntity(
             showId = show.id,
             showName = show.name,
             showRating = show.rating?.average,
             showGenres = show.genres.joinToString(","),
             showSummary = show.summary?.replace(Regex("<[^>]*>"), "")?.take(200),
-            timestamp = System.currentTimeMillis()
+            timestamp = timestamp
         )
         favouriteDao.addToFavourites(entity)
     }

@@ -23,13 +23,24 @@ fun ListScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
+    val listState = rememberLazyListState()
+
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val visibleItems = layoutInfo.visibleItemsInfo
+            if (visibleItems.isEmpty()) return@derivedStateOf false
+            val lastVisibleIndex = visibleItems.last().index
+            val totalItems = layoutInfo.totalItemsCount
+            lastVisibleIndex >= totalItems - 3 && totalItems > 0
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .testTag("list_screen")
     ) {
-        // Поисковая строка
         OutlinedTextField(
             value = searchQuery,
             onValueChange = {
@@ -44,7 +55,6 @@ fun ListScreen(
             singleLine = true
         )
 
-        // Контент
         when (val currentState = uiState) {
             is ListUiState.Loading -> {
                 Box(
@@ -98,14 +108,11 @@ fun ListScreen(
             is ListUiState.Success -> {
                 val shows = currentState.shows
                 val isLoadingMore = currentState.isLoadingMore
-                val listState = rememberLazyListState()
+                val hasError = currentState.hasError
 
-                LaunchedEffect(listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index) {
-                    if (!isLoadingMore && shows.isNotEmpty()) {
-                        val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: return@LaunchedEffect
-                        if (lastVisibleIndex >= shows.size - 3) {
-                            viewModel.nextPage()
-                        }
+                LaunchedEffect(shouldLoadMore) {
+                    if (shouldLoadMore && !isLoadingMore && !hasError) {
+                        viewModel.nextPage()
                     }
                 }
 
@@ -118,8 +125,8 @@ fun ListScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(
-                        items = shows,
-                        key = { show -> show.id }
+                        items = shows.distinctBy { it.id },
+                        key = { show -> "show_${show.id}" }
                     ) { show ->
                         ShowCard(
                             show = show,
@@ -128,9 +135,7 @@ fun ListScreen(
                     }
 
                     if (isLoadingMore) {
-                        item(
-                            key = "loading_more_item"
-                        ) {
+                        item(key = "loading_more_item") {
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -151,6 +156,30 @@ fun ListScreen(
                                         fontSize = 14.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
+                                }
+                            }
+                        }
+                    }
+
+                    if (hasError) {
+                        item(key = "load_error_item") {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = "Ошибка загрузки",
+                                        color = MaterialTheme.colorScheme.error,
+                                        fontSize = 14.sp
+                                    )
+                                    TextButton(
+                                        onClick = { viewModel.retryNextPage() }
+                                    ) {
+                                        Text("Повторить")
+                                    }
                                 }
                             }
                         }

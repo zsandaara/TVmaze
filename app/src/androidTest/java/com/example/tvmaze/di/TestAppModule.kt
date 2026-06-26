@@ -10,7 +10,6 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.components.SingletonComponent
 import dagger.hilt.testing.TestInstallIn
-import kotlinx.coroutines.delay
 import javax.inject.Singleton
 
 @Module
@@ -67,17 +66,14 @@ object TestAppModule {
     fun provideTvMazeApiService(): TvMazeApiService {
         return object : TvMazeApiService {
             override suspend fun getShows(page: Int): List<Show> {
-                delay(100)
                 return testShows
             }
 
             override suspend fun getShowById(id: Int): Show {
-                delay(100)
                 return testShows.find { it.id == id } ?: testShows.first()
             }
 
             override suspend fun searchShows(query: String): List<SearchResult> {
-                delay(100)
                 if (query.contains("nonexistent") || query.isEmpty()) {
                     return emptyList()
                 }
